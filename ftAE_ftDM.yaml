@@ -1,0 +1,96 @@
+model:
+  base_learning_rate: 5.0e-06
+  #base_learning_rate: 5.0e-05
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    linear_end: 0.0155
+    log_every_t: 100
+    timesteps: 1000
+    loss_type: l2
+    first_stage_key: clear
+    cond_stage_key: blur
+    image_size: 128
+    channels: 3
+    concat_mode: true
+    cond_stage_trainable: False
+    use_ema: False
+    is_finetune: True
+    # monitor: val/loss_dict_no_ema
+    #monitor: val/loss_simple
+    ckpt_path: /home/hanhn/8T2/enhance/LDM_enhance_han/newdev_yby/DM_scratch_DRIVE_reconstruction_5e-5_50epoch/checkpoints/epoch=000049.ckpt
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.AdaptorUNetModel
+      params:
+        image_size: 128
+        in_channels: 6
+        out_channels: 3
+        model_channels: 160
+        attention_resolutions:
+        - 8
+        - 4
+        - 2
+        num_res_blocks: 2
+        channel_mult:
+        - 1
+        - 2
+        - 2
+        - 4
+        num_head_channels: 32
+    first_stage_config:
+      target: ldm.models.autoencoder.VQModelInterface
+      params:
+        embed_dim: 3
+        n_embed: 32768
+        ckpt_path: /home/ubuntu/nfs/8T2/hanhn/MIA_revision/REFUGE/ckpt/ftAE_REFUGE_400_AE_1Epoch_kaggle/499_ftAE.ckpt
+        is_finetune: True
+        ddconfig:
+          double_z: false
+          z_channels: 3
+          resolution: 512
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+        lossconfig:
+            target: torch.nn.Identity
+    cond_stage_config: "__is_first_stage__"
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 1
+    num_workers: 0
+    wrap: true
+    train:
+      target: ldm.data.fundus.DRIVE
+      params:
+        data_root_blur: /home/ubuntu/nfs/8T2/hanhn/MIA_revision/REFUGE/dataset/REFUGE_400test_0.25contrast/REFUGE_val_clear_50_512_contrast
+        data_root_clear: /home/ubuntu/nfs/8T2/hanhn/MIA_revision/REFUGE/dataset/REFUGE_400test_0.25contrast/REFUGE_val_clear_50_512_clear
+        image_size: 512
+        image_number: 50
+    validation:
+      target: ldm.data.fundus.DRIVE
+      params:
+        data_root_blur: /home/ubuntu/nfs/8T2/hanhn/MIA_revision/REFUGE/dataset/REFUGE_400test_0.25contrast/REFUGE_test_400_512_contrast
+        data_root_clear: /home/ubuntu/nfs/8T2/hanhn/MIA_revision/REFUGE/dataset/REFUGE_400test_0.25contrast/REFUGE_test_400_512_clear
+        image_size: 512
+        image_number: 50
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        batch_frequency: 200
+        max_images: 8
+        increase_log_steps: False
+
+  trainer:
+    benchmark: True
+    accumulate_grad_batches: 1
+    max_epochs: 200
